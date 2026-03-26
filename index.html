@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数据库版 Todo List + AI 助理</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .ai-wrap {
+      padding: 18px;
+    }
+
+    .ai-box {
+      display: grid;
+      gap: 14px;
+    }
+
+    .ai-input-row {
+      display: grid;
+      grid-template-columns: 1.4fr auto auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .ai-loading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #bfdbfe;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .ai-error {
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #fff1f2;
+      color: #be123c;
+      border: 1px solid #fecdd3;
+    }
+
+    .ai-manual-tip {
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #fffbeb;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+
+    .ai-result {
+      display: grid;
+      gap: 12px;
+    }
+
+    .ai-result-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ai-subtask-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .ai-subtask-card {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      background: #fff;
+      padding: 14px;
+    }
+
+    .ai-subtask-main {
+      flex: 1;
+    }
+
+    .ai-subtask-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .focus-wrap,
+    .kanban-wrap,
+    .task-list-wrap {
+      padding: 18px;
+    }
+
+    .focus-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .focus-card {
+      border: 1px solid #e5e7eb;
+      background: linear-gradient(135deg, #fff, #f8fbff);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .focus-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .focus-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .compact-meta {
+      margin-bottom: 0;
+    }
+
+    .kanban-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .kanban-column {
+      border-radius: 18px;
+      padding: 14px;
+      border: 1px solid #e5e7eb;
+      min-height: 280px;
+    }
+
+    .kanban-waiting {
+      background: #f8fafc;
+    }
+
+    .kanban-doing {
+      background: #faf5ff;
+    }
+
+    .kanban-done {
+      background: #f0fdf4;
+    }
+
+    .kanban-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .kanban-header h3 {
+      font-size: 18px;
+    }
+
+    .kanban-header span {
+      min-width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.85);
+      border: 1px solid #e5e7eb;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .kanban-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .kanban-task {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .kanban-task-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .kanban-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .badge-stage-waiting {
+      background: #f3f4f6;
+      color: #374151;
+      border-color: #d1d5db;
+    }
+
+    .badge-stage-doing {
+      background: #ede9fe;
+      color: #6d28d9;
+      border-color: #c4b5fd;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 1180px) {
+      .kanban-board {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .ai-input-row {
+        grid-template-columns: 1fr;
+      }
+
+      .ai-subtask-card {
+        flex-direction: column;
+      }
+
+      .focus-top {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="card left-panel">
+      <div class="panel-header">
+        <h1>Todo List</h1>
+        <p>数据库版任务管理系统，支持增删改查、搜索筛选、详情弹窗、图片附件、任务看板、今日重点任务视图，以及 AI 智能辅助。</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat-box">
+          <strong id="stat-total">0</strong>
+          <span>总任务</span>
+        </div>
+        <div class="stat-box">
+          <strong id="stat-pending">0</strong>
+          <span>未完成</span>
+        </div>
+        <div class="stat-box">
+          <strong id="stat-done">0</strong>
+          <span>已完成</span>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="section-title" id="form-title">新增待办事项</h2>
+        <form id="task-form">
+          <div>
+            <label for="task-title">任务标题</label>
+            <input id="task-title" type="text" maxlength="100" placeholder="例如：完成 Web 作业" required />
+          </div>
+
+          <div class="form-grid">
+            <div>
+              <label for="task-priority">优先级</label>
+              <select id="task-priority">
+                <option value="高">高</option>
+                <option value="中" selected>中</option>
+                <option value="低">低</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="task-time">预定时间</label>
+              <input id="task-time" type="datetime-local" />
+            </div>
+          </div>
+
+          <div>
+            <label for="task-notes">任务备注</label>
+            <textarea id="task-notes" placeholder="填写任务说明、补充信息等"></textarea>
+          </div>
+
+          <div>
+            <label for="task-files">上传图片附件</label>
+            <input id="task-files" type="file" accept="image/*" multiple />
+            <div class="file-tip">支持上传多张图片，图片会以 Base64 形式保存到数据库中。</div>
+          </div>
+
+          <div class="button-row">
+            <button class="btn btn-primary" type="submit" id="submit-btn">添加任务</button>
+            <button class="btn btn-secondary" type="button" id="cancel-edit" style="display:none;">取消编辑</button>
+            <button class="btn btn-secondary" type="reset">清空表单</button>
+          </div>
+        </form>
+      </div>
+    </aside>
+
+    <main class="right-panel">
+      <section class="card ai-wrap">
+        <div class="task-list-header">
+          <div>
+            <h2>AI 助理</h2>
+            <p id="ai-status-text">正在检查 AI 状态...</p>
+          </div>
+        </div>
+
+        <div class="ai-box">
+          <div class="ai-input-row">
+            <input id="ai-task-input" type="text" placeholder="例如：准备期末考试" />
+            <button class="btn btn-primary" id="ai-decompose-btn" type="button">🤖 AI 拆解</button>
+            <button class="btn btn-secondary" id="ai-chat-add-btn" type="button">对话式添加</button>
+          </div>
+
+          <div id="ai-loading" class="ai-loading" style="display:none;">
+            <div class="spinner"></div>
+            <span>AI 正在思考，请稍等...</span>
+          </div>
+
+          <div id="ai-error" class="ai-error" style="display:none;"></div>
+
+          <div id="ai-manual-tip" class="ai-manual-tip" style="display:none;">
+            AI 助理暂时不可用，已切换到手动模式。你仍然可以直接添加任务。
+          </div>
+
+          <div id="ai-result" class="ai-result"></div>
+        </div>
+      </section>
+
+      <section class="card focus-wrap">
+        <div class="task-list-header">
+          <div>
+            <h2>今日重点</h2>
+            <p>快速查看今天最重要的任务</p>
+          </div>
+        </div>
+        <div id="today-focus"></div>
+      </section>
+
+      <section class="card toolbar">
+        <div>
+          <input id="search-input" type="text" placeholder="搜索任务标题或备注" />
+        </div>
+
+        <div>
+          <select id="status-filter">
+            <option value="全部">全部</option>
+            <option value="未完成">未完成</option>
+            <option value="已完成">已完成</option>
+          </select>
+        </div>
+
+        <div>
+          <select id="priority-filter">
+            <option value="全部">全部优先级</option>
+            <option value="高">高优先级</option>
+            <option value="中">中优先级</option>
+            <option value="低">低优先级</option>
+          </select>
+        </div>
+
+        <div>
+          <select id="sort-select">
+            <option value="created-desc">按创建时间：新到旧</option>
+            <option value="created-asc">按创建时间：旧到新</option>
+            <option value="time-asc">按预定时间：近到远</option>
+            <option value="time-desc">按预定时间：远到近</option>
+            <option value="priority-desc">按优先级：高到低</option>
+            <option value="priority-asc">按优先级：低到高</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="card kanban-wrap">
+        <div class="task-list-header">
+          <div>
+            <h2>任务看板</h2>
+            <p>任务在不同区块之间流转：待开始、进行中、已完成</p>
+          </div>
+        </div>
+        <div class="kanban-board" id="kanban-board"></div>
+      </section>
+
+      <section class="card task-list-wrap">
+        <div class="task-list-header">
+          <div>
+            <h2>任务列表</h2>
+            <p id="list-summary">当前共有 0 条任务</p>
+          </div>
+        </div>
+        <div class="task-list" id="task-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="preview-modal" id="detail-modal">
+    <div class="preview-content" style="max-width:min(92vw,760px); width:100%; padding:22px;">
+      <button class="preview-close" id="detail-close" aria-label="关闭详情">×</button>
+      <div id="detail-body"></div>
+    </div>
+  </div>
+
+  <div class="preview-modal" id="preview-modal">
+    <div class="preview-content">
+      <button class="preview-close" id="preview-close" aria-label="关闭预览">×</button>
+      <img id="preview-image" src="" alt="附件预览" />
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      tasks: [],
+      editingId: null,
+      aiAvailable: false,
+      lastAiAvailable: false
+    };
+
+    const STAGES = ['待开始', '进行中', '已完成'];
+
+    const els = {
+      form: document.getElementById('task-form'),
+      formTitle: document.getElementById('form-title'),
+      taskTitle: document.getElementById('task-title'),
+      taskPriority: document.getElementById('task-priority'),
+      taskTime: document.getElementById('task-time'),
+      taskNotes: document.getElementById('task-notes'),
+      taskFiles: document.getElementById('task-files'),
+      submitBtn: document.getElementById('submit-btn'),
+      cancelEdit: document.getElementById('cancel-edit'),
+
+      searchInput: document.getElementById('search-input'),
+      statusFilter: document.getElementById('status-filter'),
+      priorityFilter: document.getElementById('priority-filter'),
+      sortSelect: document.getElementById('sort-select'),
+
+      taskList: document.getElementById('task-list'),
+      listSummary: document.getElementById('list-summary'),
+      statTotal: document.getElementById('stat-total'),
+      statPending: document.getElementById('stat-pending'),
+      statDone: document.getElementById('stat-done'),
+
+      todayFocus: document.getElementById('today-focus'),
+      kanbanBoard: document.getElementById('kanban-board'),
+
+      aiStatusText: document.getElementById('ai-status-text'),
+      aiTaskInput: document.getElementById('ai-task-input'),
+      aiDecomposeBtn: document.getElementById('ai-decompose-btn'),
+      aiChatAddBtn: document.getElementById('ai-chat-add-btn'),
+      aiLoading: document.getElementById('ai-loading'),
+      aiError: document.getElementById('ai-error'),
+      aiManualTip: document.getElementById('ai-manual-tip'),
+      aiResult: document.getElementById('ai-result'),
+
+      detailModal: document.getElementById('detail-modal'),
+      detailBody: document.getElementById('detail-body'),
+      detailClose: document.getElementById('detail-close'),
+
+      previewModal: document.getElementById('preview-modal'),
+      previewImage: document.getElementById('preview-image'),
+      previewClose: document.getElementById('preview-close')
+    };
+
+    async function apiFetch(url, options = {}) {
+      const res = await fetch(url, options);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || '请求失败');
+      }
+      return data;
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '未设置';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '未设置';
+      return new Intl.DateTimeFormat('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date).replace(/\//g, '-');
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function priorityWeight(priority) {
+      if (priority === '高') return 3;
+      if (priority === '中') return 2;
+      return 1;
+    }
+
+    function stageClass(stage) {
+      if (stage === '待开始') return 'badge-stage-waiting';
+      if (stage === '进行中') return 'badge-stage-doing';
+      return 'badge-done';
+    }
+
+    function isToday(value) {
+      if (!value) return false;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return false;
+      const now = new Date();
+      return (
+        date.getFullYear() === now.getFullYear() &&
+        date.getMonth() === now.getMonth() &&
+        date.getDate() === now.getDate()
+      );
+    }
+
+    async function readFilesAsDataUrls(fileList) {
+      const files = Array.from(fileList || []).filter(file => file.type.startsWith('image/'));
+      return Promise.all(
+        files.map(file => new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            resolve({
+              id: Date.now() + '_' + Math.random().toString(16).slice(2),
+              name: file.name,
+              url: reader.result
+            });
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        }))
+      );
+    }
+
+    async function loadTasks() {
+      state.tasks = await apiFetch('/api/tasks');
+      renderAll();
+    }
+
+    function resetForm() {
+      els.form.reset();
+      els.taskPriority.value = '中';
+      state.editingId = null;
+      els.formTitle.textContent = '新增待办事项';
+      els.submitBtn.textContent = '添加任务';
+      els.cancelEdit.style.display = 'none';
+    }
+
+    function fillForm(task) {
+      els.taskTitle.value = task.title;
+      els.taskPriority.value = task.priority;
+      els.taskTime.value = task.scheduled_time || '';
+      els.taskNotes.value = task.notes || '';
+      els.taskFiles.value = '';
+      state.editingId = task.id;
+      els.formTitle.textContent = '编辑待办事项';
+      els.submitBtn.textContent = '保存修改';
+      els.cancelEdit.style.display = 'inline-block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateStats(tasks) {
+      const total = tasks.length;
+      const done = tasks.filter(task => task.completed).length;
+      const pending = total - done;
+      els.statTotal.textContent = total;
+      els.statDone.textContent = done;
+      els.statPending.textContent = pending;
+    }
+
+    function getProcessedTasks() {
+      const keyword = els.searchInput.value.trim().toLowerCase();
+      const status = els.statusFilter.value;
+      const priority = els.priorityFilter.value;
+      const sort = els.sortSelect.value;
+
+      const result = [...state.tasks].filter(task => {
+        const matchKeyword =
+          !keyword ||
+          task.title.toLowerCase().includes(keyword) ||
+          (task.notes || '').toLowerCase().includes(keyword);
+
+        const matchStatus =
+          status === '全部' ||
+          (status === '已完成' && task.completed) ||
+          (status === '未完成' && !task.completed);
+
+        const matchPriority =
+          priority === '全部' || task.priority === priority;
+
+        return matchKeyword && matchStatus && matchPriority;
+      });
+
+      result.sort((a, b) => {
+        switch (sort) {
+          case 'created-asc':
+            return new Date(a.created_at) - new Date(b.created_at);
+          case 'created-desc':
+            return new Date(b.created_at) - new Date(a.created_at);
+          case 'time-asc': {
+            const at = a.scheduled_time ? new Date(a.scheduled_time).getTime() : Number.MAX_SAFE_INTEGER;
+            const bt = b.scheduled_time ? new Date(b.scheduled_time).getTime() : Number.MAX_SAFE_INTEGER;
+            return at - bt;
+          }
+          case 'time-desc': {
+            const at = a.scheduled_time ? new Date(a.scheduled_time).getTime() : 0;
+            const bt = b.scheduled_time ? new Date(b.scheduled_time).getTime() : 0;
+            return bt - at;
+          }
+          case 'priority-desc':
+            return priorityWeight(b.priority) - priorityWeight(a.priority);
+          case 'priority-asc':
+            return priorityWeight(a.priority) - priorityWeight(b.priority);
+          default:
+            return 0;
+        }
+      });
+
+      return result;
+    }
+
+    function renderTodayFocus() {
+      const todayTasks = state.tasks
+        .filter(task => !task.completed && isToday(task.scheduled_time))
+        .sort((a, b) => {
+          const p = priorityWeight(b.priority) - priorityWeight(a.priority);
+          if (p !== 0) return p;
+          return new Date(a.scheduled_time || 0) - new Date(b.scheduled_time || 0);
+        })
+        .slice(0, 3);
+
+      if (!todayTasks.length) {
+        els.todayFocus.innerHTML = `
+          <div class="empty">
+            <div>今天暂无重点任务。</div>
+            <div>你可以安排新的今日任务。</div>
+          </div>
+        `;
+        return;
+      }
+
+      els.todayFocus.innerHTML = `
+        <div class="focus-list">
+          ${todayTasks.map(task => `
+            <article class="focus-card">
+              <div class="focus-top">
+                <div>
+                  <div class="focus-title">${escapeHtml(task.title)}</div>
+                  <div class="meta compact-meta">
+                    <div>时间：${formatDateTime(task.scheduled_time)}</div>
+                  </div>
+                </div>
+                <span class="badge ${task.priority === '高' ? 'badge-high' : task.priority === '中' ? 'badge-medium' : 'badge-low'}">
+                  ${task.priority}
+                </span>
+              </div>
+              <div class="badge-row">
+                <span class="badge ${stageClass(task.stage)}">${task.stage}</span>
+              </div>
+            </article>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderKanban() {
+      els.kanbanBoard.innerHTML = STAGES.map(stage => {
+        const tasks = state.tasks.filter(task => task.stage === stage);
+        const columnClass =
+          stage === '待开始' ? 'kanban-waiting' :
+          stage === '进行中' ? 'kanban-doing' : 'kanban-done';
+
+        return `
+          <section class="kanban-column ${columnClass}">
+            <div class="kanban-header">
+              <h3>${stage}</h3>
+              <span>${tasks.length}</span>
+            </div>
+            <div class="kanban-list">
+              ${tasks.length ? tasks.map(task => `
+                <article class="kanban-task">
+                  <div class="kanban-task-title">${escapeHtml(task.title)}</div>
+                  <div class="badge-row">
+                    <span class="badge ${task.priority === '高' ? 'badge-high' : task.priority === '中' ? 'badge-medium' : 'badge-low'}">
+                      ${task.priority}
+                    </span>
+                  </div>
+                  <div class="meta compact-meta">
+                    <div>${formatDateTime(task.scheduled_time)}</div>
+                  </div>
+                  <div class="kanban-actions">
+                    ${stage !== '待开始' ? `<button class="inline-btn" data-action="move-prev" data-id="${task.id}">左移</button>` : ''}
+                    ${stage !== '已完成' ? `<button class="inline-btn" data-action="move-next" data-id="${task.id}">右移</button>` : ''}
+                    <button class="inline-btn" data-action="detail" data-id="${task.id}">详情</button>
+                  </div>
+                </article>
+              `).join('') : `<div class="empty">当前分组暂无任务</div>`}
+            </div>
+          </section>
+        `;
+      }).join('');
+    }
+
+    function renderTaskList() {
+      const tasks = getProcessedTasks();
+
+      els.listSummary.textContent = `当前显示 ${tasks.length} 条任务，数据库中共有 ${state.tasks.length} 条任务`;
+      updateStats(state.tasks);
+
+      if (!tasks.length) {
+        els.taskList.innerHTML = `
+          <div class="empty">
+            <div>暂无符合条件的任务。</div>
+            <div>请新增任务或调整筛选条件。</div>
+          </div>
+        `;
+        return;
+      }
+
+      els.taskList.innerHTML = tasks.map(task => {
+        const priorityClass =
+          task.priority === '高' ? 'badge-high' :
+          task.priority === '中' ? 'badge-medium' : 'badge-low';
+
+        const statusClass = task.completed ? 'badge-done' : 'badge-pending';
+
+        const notesHtml = task.notes
+          ? `<div class="notes">${escapeHtml(task.notes)}</div>`
+          : '';
+
+        const thumbsHtml = (task.attachments || []).length
+          ? `<div class="thumbs">
+              ${task.attachments.map(att => `
+                <img class="thumb" src="${att.url}" alt="${escapeHtml(att.name)}" data-image="${att.url}" />
+              `).join('')}
+            </div>`
+          : '';
+
+        return `
+          <article class="task-card">
+            <div class="task-top">
+              <div class="check-wrap">
+                <input class="task-check" type="checkbox" data-action="toggle" data-id="${task.id}" ${task.completed ? 'checked' : ''} />
+              </div>
+
+              <div class="task-main">
+                <div class="task-title-row">
+                  <h3 class="task-title ${task.completed ? 'completed' : ''}">${escapeHtml(task.title)}</h3>
+                </div>
+
+                <div class="badge-row">
+                  <span class="badge ${priorityClass}">${task.priority} 优先级</span>
+                  <span class="badge ${statusClass}">${task.completed ? '已完成' : '未完成'}</span>
+                  <span class="badge ${stageClass(task.stage)}">${task.stage}</span>
+                </div>
+
+                <div class="meta">
+                  <div>预定时间：${formatDateTime(task.scheduled_time)}</div>
+                  <div>创建时间：${formatDateTime(task.created_at)}</div>
+                  <div>附件数量：${(task.attachments || []).length} 张</div>
+                </div>
+
+                ${notesHtml}
+                ${thumbsHtml}
+              </div>
+            </div>
+
+            <div class="task-actions">
+              <button class="inline-btn" data-action="detail" data-id="${task.id}">查看详情</button>
+              <button class="inline-btn" data-action="edit" data-id="${task.id}">编辑</button>
+              ${task.stage !== '待开始' ? `<button class="inline-btn" data-action="move-prev" data-id="${task.id}">左移</button>` : ''}
+              ${task.stage !== '已完成' ? `<button class="inline-btn" data-action="move-next" data-id="${task.id}">右移</button>` : ''}
+              <button class="inline-btn" data-action="toggle" data-id="${task.id}">
+                ${task.completed ? '标记为未完成' : '标记为完成'}
+              </button>
+              <button class="inline-btn delete" data-action="delete" data-id="${task.id}">删除</button>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    function renderAll() {
+      renderTodayFocus();
+      renderKanban();
+      renderTaskList();
+    }
+
+    function openDetail(task) {
+      const attachmentsHtml = (task.attachments || []).length
+        ? `<div class="thumbs">
+            ${task.attachments.map(att => `
+              <img class="thumb" src="${att.url}" alt="${escapeHtml(att.name)}" data-image="${att.url}" />
+            `).join('')}
+          </div>`
+        : '<p class="muted">暂无附件</p>';
+
+      els.detailBody.innerHTML = `
+        <div style="display:grid; gap:16px;">
+          <div>
+            <h2 style="font-size:28px; margin-bottom:10px;">${escapeHtml(task.title)}</h2>
+            <div class="badge-row">
+              <span class="badge ${task.priority === '高' ? 'badge-high' : task.priority === '中' ? 'badge-medium' : 'badge-low'}">
+                ${task.priority} 优先级
+              </span>
+              <span class="badge ${task.completed ? 'badge-done' : 'badge-pending'}">
+                ${task.completed ? '已完成' : '未完成'}
+              </span>
+              <span class="badge ${stageClass(task.stage)}">${task.stage}</span>
+            </div>
+          </div>
+
+          <div class="meta">
+            <div>预定时间：${formatDateTime(task.scheduled_time)}</div>
+            <div>创建时间：${formatDateTime(task.created_at)}</div>
+            <div>附件数量：${(task.attachments || []).length} 张</div>
+          </div>
+
+          <div>
+            <div style="font-weight:700; margin-bottom:8px;">任务备注</div>
+            <div class="notes">${task.notes ? escapeHtml(task.notes) : '暂无备注'}</div>
+          </div>
+
+          <div>
+            <div style="font-weight:700; margin-bottom:8px;">图片附件</div>
+            ${attachmentsHtml}
+          </div>
+        </div>
+      `;
+
+      els.detailModal.classList.add('open');
+    }
+
+    function closeDetail() {
+      els.detailModal.classList.remove('open');
+      els.detailBody.innerHTML = '';
+    }
+
+    function openPreview(src) {
+      els.previewImage.src = src;
+      els.previewModal.classList.add('open');
+    }
+
+    function closePreview() {
+      els.previewModal.classList.remove('open');
+      els.previewImage.src = '';
+    }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+
+      const title = els.taskTitle.value.trim();
+      if (!title) {
+        alert('请输入任务标题');
+        return;
+      }
+
+      const newAttachments = await readFilesAsDataUrls(els.taskFiles.files);
+
+      if (state.editingId) {
+        const oldTask = state.tasks.find(task => task.id === state.editingId);
+        const payload = {
+          title,
+          notes: els.taskNotes.value.trim(),
+          priority: els.taskPriority.value,
+          scheduled_time: els.taskTime.value || '',
+          completed: oldTask.completed,
+          stage: oldTask.stage,
+          attachments: [...(oldTask.attachments || []), ...newAttachments]
+        };
+
+        await apiFetch(`/api/tasks/${state.editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        const payload = {
+          title,
+          notes: els.taskNotes.value.trim(),
+          priority: els.taskPriority.value,
+          scheduled_time: els.taskTime.value || '',
+          completed: false,
+          stage: '待开始',
+          attachments: newAttachments
+        };
+
+        await apiFetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      resetForm();
+      await loadTasks();
+    }
+
+    async function deleteTask(id) {
+      const ok = confirm('确定删除这个任务吗？');
+      if (!ok) return;
+
+      await apiFetch(`/api/tasks/${id}`, { method: 'DELETE' });
+
+      if (state.editingId === id) {
+        resetForm();
+      }
+
+      await loadTasks();
+    }
+
+    async function toggleTask(id) {
+      await apiFetch(`/api/tasks/${id}/toggle`, { method: 'PATCH' });
+      await loadTasks();
+    }
+
+    async function moveTask(id, direction) {
+      const task = state.tasks.find(item => item.id === id);
+      if (!task) return;
+
+      const currentIndex = STAGES.indexOf(task.stage);
+      let nextIndex = currentIndex;
+
+      if (direction === 'next') {
+        nextIndex = Math.min(STAGES.length - 1, currentIndex + 1);
+      } else if (direction === 'prev') {
+        nextIndex = Math.max(0, currentIndex - 1);
+      }
+
+      const nextStage = STAGES[nextIndex];
+
+      await apiFetch(`/api/tasks/${id}/stage`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: nextStage })
+      });
+
+      await loadTasks();
+    }
+
+    async function addTaskDirect({ title, priority = '中' }) {
+      await apiFetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          notes: '',
+          priority,
+          scheduled_time: '',
+          completed: false,
+          stage: '待开始',
+          attachments: []
+        })
+      });
+
+      await loadTasks();
+    }
+
+    async function checkAiStatus(showRecoveredNotice = false) {
+      try {
+        const data = await apiFetch('/api/ai/status');
+        state.lastAiAvailable = state.aiAvailable;
+        state.aiAvailable = !!data.available;
+
+        els.aiStatusText.textContent = data.message || (state.aiAvailable ? 'AI 助理在线' : 'AI 助理不可用');
+        els.aiManualTip.style.display = state.aiAvailable ? 'none' : 'block';
+
+        if (showRecoveredNotice && !state.lastAiAvailable && state.aiAvailable) {
+          alert('AI 助理回来了，要试试智能拆解吗？');
+        }
+      } catch (error) {
+        state.lastAiAvailable = state.aiAvailable;
+        state.aiAvailable = false;
+        els.aiStatusText.textContent = 'AI 状态检查失败，当前使用手动模式';
+        els.aiManualTip.style.display = 'block';
+      }
+    }
+
+    function setAiLoading(loading) {
+      els.aiLoading.style.display = loading ? 'flex' : 'none';
+      els.aiDecomposeBtn.disabled = loading;
+      els.aiChatAddBtn.disabled = loading;
+    }
+
+    function showAiError(message) {
+      els.aiError.style.display = 'block';
+      els.aiError.textContent = message;
+    }
+
+    function clearAiError() {
+      els.aiError.style.display = 'none';
+      els.aiError.textContent = '';
+    }
+
+    function renderAiResult(category, subtasks) {
+      els.aiResult.innerHTML = `
+        <div class="ai-result-head">
+          <strong>AI 拆解结果</strong>
+          <span class="badge badge-pending">分类：${escapeHtml(category)}</span>
+        </div>
+        <div class="ai-subtask-list">
+          ${subtasks.map((item, index) => `
+            <article class="ai-subtask-card">
+              <div class="ai-subtask-main">
+                <div class="ai-subtask-title">${index + 1}. ${escapeHtml(item.title)}</div>
+                <div class="badge-row">
+                  <span class="badge ${item.priority === '高' ? 'badge-high' : item.priority === '中' ? 'badge-medium' : 'badge-low'}">
+                    ${item.priority}
+                  </span>
+                  <span class="badge badge-pending">${item.estimatedMinutes} 分钟</span>
+                </div>
+              </div>
+              <button
+                class="inline-btn"
+                data-ai-add="1"
+                data-title="${escapeHtml(item.title)}"
+                data-priority="${item.priority}"
+              >
+                + 添加
+              </button>
+            </article>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    async function handleAiDecompose() {
+      const text = els.aiTaskInput.value.trim();
+      if (!text) {
+        showAiError('请先输入一个任务，例如：准备期末考试');
+        return;
+      }
+
+      clearAiError();
+      setAiLoading(true);
+
+      try {
+        const result = await apiFetch('/api/ai/decompose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+
+        state.aiAvailable = true;
+        els.aiManualTip.style.display = 'none';
+        els.aiStatusText.textContent = 'AI 助理在线';
+        renderAiResult(result.category, result.subtasks);
+      } catch (error) {
+        state.aiAvailable = false;
+        els.aiManualTip.style.display = 'block';
+        els.aiStatusText.textContent = 'AI 助理暂时不可用，当前使用手动模式';
+        showAiError(error.message || 'AI 拆解失败，请稍后再试');
+        els.aiResult.innerHTML = '';
+      } finally {
+        setAiLoading(false);
+      }
+    }
+
+    async function handleAiChatAdd() {
+      const text = els.aiTaskInput.value.trim();
+      if (!text) {
+        showAiError('请先输入任务内容');
+        return;
+      }
+
+      clearAiError();
+
+      if (!state.aiAvailable) {
+        els.taskTitle.value = text;
+        els.taskTitle.focus();
+        showAiError('AI 当前不可用，已切换为手动添加模式');
+        return;
+      }
+
+      setAiLoading(true);
+      try {
+        const result = await apiFetch('/api/ai/classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+
+        els.taskTitle.value = text;
+        els.taskPriority.value = result.priority || '中';
+        els.taskNotes.value = `AI 分类：${result.category}`;
+        els.taskTitle.focus();
+      } catch (error) {
+        state.aiAvailable = false;
+        els.aiManualTip.style.display = 'block';
+        showAiError('AI 分类失败，已切换到手动模式');
+        els.taskTitle.value = text;
+        els.taskTitle.focus();
+      } finally {
+        setAiLoading(false);
+      }
+    }
+
+    async function handleTaskAreaClick(event) {
+      const target = event.target;
+
+      if (target.matches('[data-action]')) {
+        const id = Number(target.getAttribute('data-id'));
+        const action = target.getAttribute('data-action');
+
+        if (action === 'delete') {
+          await deleteTask(id);
+          return;
+        }
+
+        if (action === 'toggle') {
+          await toggleTask(id);
+          return;
+        }
+
+        if (action === 'move-next') {
+          await moveTask(id, 'next');
+          return;
+        }
+
+        if (action === 'move-prev') {
+          await moveTask(id, 'prev');
+          return;
+        }
+
+        if (action === 'edit') {
+          const task = state.tasks.find(item => item.id === id);
+          if (task) fillForm(task);
+          return;
+        }
+
+        if (action === 'detail') {
+          const task = state.tasks.find(item => item.id === id);
+          if (task) openDetail(task);
+          return;
+        }
+      }
+
+      if (target.matches('[data-image]')) {
+        openPreview(target.getAttribute('data-image'));
+      }
+    }
+
+    function bindEvents() {
+      els.form.addEventListener('submit', async (e) => {
+        try {
+          await handleSubmit(e);
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+
+      els.cancelEdit.addEventListener('click', resetForm);
+
+      [els.searchInput, els.statusFilter, els.priorityFilter, els.sortSelect].forEach(el => {
+        el.addEventListener('input', renderTaskList);
+        el.addEventListener('change', renderTaskList);
+      });
+
+      els.taskList.addEventListener('click', async (e) => {
+        try {
+          await handleTaskAreaClick(e);
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+
+      els.kanbanBoard.addEventListener('click', async (e) => {
+        try {
+          await handleTaskAreaClick(e);
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+
+      els.todayFocus.addEventListener('click', async (e) => {
+        try {
+          await handleTaskAreaClick(e);
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+
+      els.detailBody.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.matches('[data-image]')) {
+          openPreview(target.getAttribute('data-image'));
+        }
+      });
+
+      els.aiDecomposeBtn.addEventListener('click', async () => {
+        await handleAiDecompose();
+      });
+
+      els.aiChatAddBtn.addEventListener('click', async () => {
+        await handleAiChatAdd();
+      });
+
+      els.aiResult.addEventListener('click', async (event) => {
+        const btn = event.target.closest('[data-ai-add]');
+        if (!btn) return;
+
+        const title = btn.getAttribute('data-title');
+        const priority = btn.getAttribute('data-priority') || '中';
+
+        try {
+          await addTaskDirect({ title, priority });
+          btn.textContent = '已添加';
+          btn.disabled = true;
+        } catch (error) {
+          alert(error.message || '添加子任务失败');
+        }
+      });
+
+      els.detailClose.addEventListener('click', closeDetail);
+      els.previewClose.addEventListener('click', closePreview);
+
+      els.detailModal.addEventListener('click', (e) => {
+        if (e.target === els.detailModal) closeDetail();
+      });
+
+      els.previewModal.addEventListener('click', (e) => {
+        if (e.target === els.previewModal) closePreview();
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeDetail();
+          closePreview();
+        }
+      });
+    }
+
+    async function init() {
+      bindEvents();
+      try {
+        await loadTasks();
+        await checkAiStatus(false);
+        setInterval(() => checkAiStatus(true), 30000);
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
