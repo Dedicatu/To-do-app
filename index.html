@@ -477,8 +477,11 @@
       previewClose: document.getElementById('preview-close')
     };
 
+    const API_BASE = 'https://to-do-app-8qjz.onrender.com';
+
     async function apiFetch(url, options = {}) {
-      const res = await fetch(url, options);
+      const finalUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
+      const res = await fetch(finalUrl, options);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || '请求失败');

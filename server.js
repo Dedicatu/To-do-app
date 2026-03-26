@@ -10,11 +10,14 @@ const openai = process.env.MOONSHOT_API_KEY
   : null;
 
 const express = require('express');
+const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 const app = express();
 const PORT = 3000;
+
+app.use(cors());
 
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(__dirname));
